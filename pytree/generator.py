@@ -1,49 +1,49 @@
 import os
 from pathlib import Path
 
+def parse_line_depth(line):
+    """Calculate the depth of a line based on tree characters."""
+    depth = 0
+    for char in line:
+        if char in ['│', ' ']:
+            depth += 1
+        else:
+            break
+    return depth // 4  # Normalize by dividing by 4 (standard tree indentation)
+
+def clean_name(line):
+    """Clean the name from tree characters."""
+    return line.strip().replace('│', '').replace('├──', '').replace('└──', '').replace('─', '').strip()
+
 def parse_tree(tree_content):
     """Parse the tree-like structure from the content."""
-    structure = {}
-    current_path = []
-    current_indent = 0
-    
-    lines = [line for line in tree_content.split('\n') if line.strip()]
+    lines = [line.rstrip() for line in tree_content.split('\n') if line.strip()]
+    root = {}
+    path_stack = []
+    depth_stack = [-1]
     
     for line in lines:
-        # Calculate indent level
-        indent = 0
-        for char in line:
-            if char in ['│', ' ']:
-                indent += 1
-            else:
-                break
-        indent = indent // 2  # Normalize indent level
+        depth = parse_line_depth(line)
+        name = clean_name(line)
         
-        # Clean the name (remove tree characters)
-        name = line.strip().replace('│', '').replace('├──', '').replace('└──', '').replace('─', '').strip()
-        
-        # Adjust the current path based on indent
-        if indent > current_indent:
-            current_path.append(current_path[-1])
-        elif indent < current_indent:
-            current_path = current_path[:indent+1]
-        else:
-            current_path = current_path[:-1]
-        current_path.append(name)
-        current_indent = indent
+        # Pop from stacks until we find the parent depth
+        while depth <= depth_stack[-1]:
+            depth_stack.pop()
+            path_stack.pop()
+            
+        # Add current item to stacks
+        depth_stack.append(depth)
+        path_stack.append(name)
         
         # Build the structure
-        temp = structure
-        for i, part in enumerate(current_path[:-1]):
-            if part not in temp:
-                temp[part] = {}
-            temp = temp[part]
-        
-        # Add the final item
-        if current_path[-1]:  # Only add if name is not empty
-            temp[current_path[-1]] = {}
-
-    return structure
+        current = root
+        for path_item in path_stack[:-1]:
+            if path_item not in current:
+                current[path_item] = {}
+            current = current[path_item]
+        current[path_stack[-1]] = {}
+    
+    return root
 
 def create_structure(base_path, structure):
     """Create the directory structure."""
@@ -51,31 +51,36 @@ def create_structure(base_path, structure):
         path = os.path.join(base_path, name)
         
         if name.endswith(('.py', '.txt', '.html', '.md')):  # It's a file
-            # Create parent directories if they don't exist
+            # Ensure parent directory exists
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            # Create the file
+            # Create empty file
             Path(path).touch()
         else:  # It's a directory
+            # Create directory
             os.makedirs(path, exist_ok=True)
-            if content:  # If there are subdirectories/files
-                create_structure(path, content)
+            # Recursively create contents
+            create_structure(path, content)
 
 def generate_structure(tree_file, output_dir="."):
     """Main function to generate directory structure from tree file."""
     try:
+        # Read the tree file
         with open(tree_file, 'r', encoding='utf-8') as f:
             content = f.read()
         
+        # Parse and create structure
         structure = parse_tree(content)
         create_structure(output_dir, structure)
+        
         print(f"Successfully created directory structure in {output_dir}")
+        
     except Exception as e:
         print(f"Error: {str(e)}")
         raise
 
-def debug_structure(structure, level=0):
-    """Helper function to debug the parsed structure."""
+def print_structure(structure, level=0):
+    """Debug function to print the parsed structure."""
     for name, content in structure.items():
         print("  " * level + name)
         if content:
-            debug_structure(content, level + 1)
+            print_structure(content, level + 1)
