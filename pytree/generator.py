@@ -1,4 +1,3 @@
-
 import os
 from pathlib import Path
 
@@ -6,34 +5,33 @@ def parse_tree(tree_content):
     """Parse the tree-like structure from the content."""
     structure = {}
     current_path = []
-    prev_indent = 0
     
-    for line in tree_content.split('\n'):
-        if not line.strip():
-            continue
-            
-        # Count leading spaces/symbols to determine depth
-        indent = len(line) - len(line.lstrip('│ ├──└──'))
-        clean_name = line.strip('│ ├──└──').strip()
+    lines = [line for line in tree_content.split('\n') if line.strip()]
+    
+    for line in lines:
+        # Count the depth based on the position of the last '|' or '└' or '├'
+        depth = 0
+        for i, char in enumerate(line):
+            if char in ['│', '└', '├', '─']:
+                depth = i // 4  # Assuming 4 spaces per level
         
-        # Adjust current path based on indent
-        if indent < prev_indent:
-            current_path = current_path[:indent//2]
-        elif indent == prev_indent:
-            if current_path:
-                current_path.pop()
-                
-        current_path.append(clean_name)
+        # Clean the name (remove tree characters)
+        name = line.strip().replace('│', '').replace('├──', '').replace('└──', '').replace('─', '').strip()
         
-        # Add to structure
+        # Adjust the current path based on depth
+        current_path = current_path[:depth]
+        current_path.append(name)
+        
+        # Build the structure
         temp = structure
-        for part in current_path[:-1]:
+        for i, part in enumerate(current_path[:-1]):
             if part not in temp:
                 temp[part] = {}
             temp = temp[part]
-        temp[current_path[-1]] = {}
         
-        prev_indent = indent
+        # Add the final item
+        if current_path[-1]:  # Only add if name is not empty
+            temp[current_path[-1]] = {}
     
     return structure
 
@@ -42,7 +40,10 @@ def create_structure(base_path, structure):
     for name, content in structure.items():
         path = os.path.join(base_path, name)
         
-        if not content:  # It's a file
+        if name.endswith(('.py', '.txt', '.html', '.md')):  # It's a file
+            # Create parent directories if they don't exist
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            # Create the file
             Path(path).touch()
         else:  # It's a directory
             os.makedirs(path, exist_ok=True)
@@ -50,7 +51,7 @@ def create_structure(base_path, structure):
 
 def generate_structure(tree_file, output_dir="."):
     """Main function to generate directory structure from tree file."""
-    with open(tree_file, 'r') as f:
+    with open(tree_file, 'r', encoding='utf-8') as f:
         content = f.read()
     
     structure = parse_tree(content)
