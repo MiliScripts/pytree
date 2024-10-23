@@ -79,7 +79,7 @@ def create_structure(base_path, structure):
                 else:
                     # Create directory
                     os.makedirs(path, exist_ok=True)
-                    # Process contents
+                    # Recursively create the substructure
                     create_recursively(path, substructure)
         
         create_recursively(root_path, contents)
