@@ -10,7 +10,7 @@ def parse_line_depth(line):
             depth += 1
         else:
             break
-    return depth // 4  # Adjust this based on your indentation style
+    return depth // 4
 
 def clean_name(line):
     """Clean the name from tree characters."""
@@ -71,13 +71,13 @@ def create_structure(base_path, structure):
             for name, substructure in current_structure.items():
                 path = os.path.join(current_path, name)
                 
-                if name.endswith(('.py', '.txt', '.html', '.md')):
+                if '.' in name:  # It's a file (e.g., .py, .txt)
                     # Create parent directories if needed
                     os.makedirs(os.path.dirname(path), exist_ok=True)
                     # Create the file
                     Path(path).touch()
                 else:
-                    # Create directory
+                    # It's a directory, create it
                     os.makedirs(path, exist_ok=True)
                     # Recursively create the substructure
                     create_recursively(path, substructure)
