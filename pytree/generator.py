@@ -6,11 +6,11 @@ def parse_line_depth(line):
     """Calculate the depth of a line based on tree characters."""
     depth = 0
     for char in line:
-        if char in ['│', ' ']:
+        if char in ['│', '├', '└', ' ']:
             depth += 1
         else:
             break
-    return depth // 4
+    return depth // 4  # Adjust this based on your indentation style
 
 def clean_name(line):
     """Clean the name from tree characters."""
@@ -32,10 +32,12 @@ def parse_tree(tree_content):
         depth = parse_line_depth(line)
         name = clean_name(line)
         
-        while depth <= depth_stack[-1]:
+        # Safeguard: Ensure there is something to pop
+        while depth_stack and depth <= depth_stack[-1]:
             depth_stack.pop()
             path_stack.pop()
             
+        # Add the current name to the stack
         path_stack.append(name)
         depth_stack.append(depth)
         
