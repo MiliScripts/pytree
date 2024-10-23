@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import shutil
 
 def parse_line_depth(line):
     """Calculate the depth of a line based on tree characters."""
@@ -9,7 +10,7 @@ def parse_line_depth(line):
             depth += 1
         else:
             break
-    return depth // 4  # Normalize by dividing by 4 (standard tree indentation)
+    return depth // 4
 
 def clean_name(line):
     """Clean the name from tree characters."""
@@ -18,48 +19,68 @@ def clean_name(line):
 def parse_tree(tree_content):
     """Parse the tree-like structure from the content."""
     lines = [line.rstrip() for line in tree_content.split('\n') if line.strip()]
-    root = {}
-    path_stack = []
-    depth_stack = [-1]
+    structure = {}
     
-    for line in lines:
+    # Get root directory name
+    root_name = clean_name(lines[0])
+    current = structure[root_name] = {}
+    path_stack = [root_name]
+    depth_stack = [0]
+    
+    # Process remaining lines
+    for line in lines[1:]:
         depth = parse_line_depth(line)
         name = clean_name(line)
         
-        # Pop from stacks until we find the parent depth
         while depth <= depth_stack[-1]:
             depth_stack.pop()
             path_stack.pop()
             
-        # Add current item to stacks
-        depth_stack.append(depth)
         path_stack.append(name)
+        depth_stack.append(depth)
         
-        # Build the structure
-        current = root
-        for path_item in path_stack[:-1]:
+        # Navigate to current position in structure
+        current = structure[root_name]
+        for path_item in path_stack[1:-1]:
             if path_item not in current:
                 current[path_item] = {}
             current = current[path_item]
-        current[path_stack[-1]] = {}
+        current[name] = {}
     
-    return root
+    return structure
 
 def create_structure(base_path, structure):
     """Create the directory structure."""
-    for name, content in structure.items():
-        path = os.path.join(base_path, name)
+    # First, clean up any existing structure
+    for name in structure:
+        full_path = os.path.join(base_path, name)
+        if os.path.exists(full_path):
+            if os.path.isdir(full_path):
+                shutil.rmtree(full_path)
+            else:
+                os.remove(full_path)
+    
+    # Create the new structure
+    for root_name, contents in structure.items():
+        root_path = os.path.join(base_path, root_name)
+        os.makedirs(root_path, exist_ok=True)
         
-        if name.endswith(('.py', '.txt', '.html', '.md')):  # It's a file
-            # Ensure parent directory exists
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            # Create empty file
-            Path(path).touch()
-        else:  # It's a directory
-            # Create directory
-            os.makedirs(path, exist_ok=True)
-            # Recursively create contents
-            create_structure(path, content)
+        def create_recursively(current_path, current_structure):
+            for name, substructure in current_structure.items():
+                path = os.path.join(current_path, name)
+                
+                if name.endswith(('.py', '.txt', '.html', '.md')):
+                    # Create parent directories if needed
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    # Create the file
+                    Path(path).touch()
+                else:
+                    # Create directory
+                    os.makedirs(path, exist_ok=True)
+                    # Process contents
+                    create_recursively(path, substructure)
+        
+        create_recursively(root_path, contents)
 
 def generate_structure(tree_file, output_dir="."):
     """Main function to generate directory structure from tree file."""
@@ -77,10 +98,3 @@ def generate_structure(tree_file, output_dir="."):
     except Exception as e:
         print(f"Error: {str(e)}")
         raise
-
-def print_structure(structure, level=0):
-    """Debug function to print the parsed structure."""
-    for name, content in structure.items():
-        print("  " * level + name)
-        if content:
-            print_structure(content, level + 1)
